@@ -1,0 +1,39 @@
+:root {
+  /* ── Palette ─────────────────────────────────────────── */
+  --ink-900: #10151a;      /* sidebar / deep panels */
+  --ink-800: #1a2128;
+  --ink-700: #2a333c;
+  --paper: #f6f4ef;        /* main canvas, warm paper */
+  --surface: #ffffff;      /* cards */
+  --border: #e3ded3;
+  --border-strong: #cfc8b8;
+  --text: #1c2024;
+  --text-muted: #6c7278;
+  --text-faint: #9a9d9f;
+
+  --accent: #2f6e6a;       /* teal — primary action / numeric data */
+  --accent-strong: #234f4c;
+  --accent-soft: #e4efee;
+  --amber: #c07a2e;        /* categorical / warnings */
+  --amber-soft: #f6ead9;
+  --violet: #6f63b8;       /* datetime */
+  --violet-soft: #ebe8f8;
+  --danger: #b3413a;
+  --danger-soft: #f7e6e4;
+  --success: #3f8f5c;
+  --success-soft: #e6f3ea;
+
+  /* ── Type ────────────────────────────────────────────── */
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* ── Shape ───────────────────────────────────────────── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --shadow-sm: 0 1px 2px rgba(16, 21, 26, 0.06);
+  --shadow-md: 0 4px 16px rgba(16, 21, 26, 0.08);
+
+  --sidebar-w: 260px;
+}
