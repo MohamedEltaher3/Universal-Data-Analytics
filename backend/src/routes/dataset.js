@@ -15,7 +15,10 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // ── GET /api/dataset/schema — schema of the most recently uploaded dataset ──
 router.get("/schema", async (req, res) => {
-  const meta = await getMetaCol().findOne({}, { sort: { uploaded_at: -1 } });
+  const meta = await getMetaCol().findOne(
+    { _session_id: req.sessionId },
+    { sort: { uploaded_at: -1 } }
+  );
   res.json(meta || null);
 });
 
@@ -36,17 +39,19 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 
     const dataCol = getDataCol();
     const metaCol = getMetaCol();
+    const sessionId = req.sessionId;
 
     if (clearExisting) {
-      await dataCol.drop().catch(() => {});
-      await metaCol.drop().catch(() => {});
+      await dataCol.deleteMany({ _session_id: sessionId });
+      await metaCol.deleteMany({ _session_id: sessionId });
     }
 
-    await metaCol.insertOne(schema);
+    await metaCol.insertOne({ ...schema, _session_id: sessionId });
 
     const docs = records.map((row, i) => {
       const doc = rowToDoc(row, schema.columns);
       doc._row_id = i + 1;
+      doc._session_id = sessionId;
       doc._created_at = new Date();
       return doc;
     });
@@ -64,12 +69,15 @@ router.post("/upload", upload.single("file"), async (req, res) => {
       }
     }
 
-    await dataCol.createIndex({ _row_id: 1 }, { name: "idx_row_id", unique: true });
+    await dataCol.createIndex(
+      { _session_id: 1, _row_id: 1 },
+      { name: "idx_session_row_id", unique: true }
+    );
     if (schema.id_column) {
       try {
         await dataCol.createIndex(
-          { [schema.id_column]: 1 },
-          { name: "idx_natural_id", unique: true }
+          { _session_id: 1, [schema.id_column]: 1 },
+          { name: "idx_session_natural_id", unique: true }
         );
       } catch (e) {
         /* natural id not actually unique — skip */
@@ -93,12 +101,15 @@ router.post("/upload", upload.single("file"), async (req, res) => {
 router.get("/overview", async (req, res) => {
   const dataCol = getDataCol();
   const metaCol = getMetaCol();
-  const schema = await metaCol.findOne({}, { sort: { uploaded_at: -1 } });
+  const sessionId = req.sessionId;
+  const schema = await metaCol.findOne({ _session_id: sessionId }, { sort: { uploaded_at: -1 } });
   if (!schema) return res.json({ hasData: false });
 
-  const total = await dataCol.countDocuments({});
-  const active = await dataCol.countDocuments(ACTIVE);
-  const sampleDoc = await dataCol.findOne(ACTIVE);
+  const sessionFilter = { _session_id: sessionId };
+  const activeFilter = { ...sessionFilter, ...ACTIVE };
+  const total = await dataCol.countDocuments(sessionFilter);
+  const active = await dataCol.countDocuments(activeFilter);
+  const sampleDoc = await dataCol.findOne(activeFilter);
   const indexes = await dataCol.indexInformation();
 
   res.json({
@@ -116,11 +127,12 @@ router.get("/overview", async (req, res) => {
 router.get("/export", async (req, res) => {
   const dataCol = getDataCol();
   const metaCol = getMetaCol();
-  const schema = await metaCol.findOne({}, { sort: { uploaded_at: -1 } });
+  const sessionId = req.sessionId;
+  const schema = await metaCol.findOne({ _session_id: sessionId }, { sort: { uploaded_at: -1 } });
   if (!schema) return res.status(400).json({ error: "لا توجد بيانات لتصديرها" });
 
   const includeDeleted = req.query.includeDeleted === "true";
-  const query = includeDeleted ? {} : ACTIVE;
+  const query = includeDeleted ? { _session_id: sessionId } : { _session_id: sessionId, ...ACTIVE };
 
   const docs = await dataCol.find(query).toArray();
   const rows = docs.map(cleanForDisplay);
@@ -140,10 +152,10 @@ router.get("/export", async (req, res) => {
   res.send(csv);
 });
 
-// ── DELETE /api/dataset — Danger Zone: wipe everything ───────────────────────
+// ── DELETE /api/dataset — Danger Zone: wipe the current session's data only ─
 router.delete("/", async (req, res) => {
-  await getDataCol().drop().catch(() => {});
-  await getMetaCol().drop().catch(() => {});
+  await getDataCol().deleteMany({ _session_id: req.sessionId });
+  await getMetaCol().deleteMany({ _session_id: req.sessionId });
   res.json({ success: true });
 });
 

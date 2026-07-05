@@ -22,6 +22,7 @@ const INTERNAL_FIELDS = new Set([
   "_updated_at",
   "_deleted_at",
   "_recovered_at",
+  "_session_id",
 ]);
 
 async function connectDB() {

@@ -3,13 +3,13 @@ const { getDataCol, getMetaCol, ACTIVE } = require("../db");
 
 const router = express.Router();
 
-async function getSchema() {
-  return getMetaCol().findOne({}, { sort: { uploaded_at: -1 } });
+async function getSchema(sessionId) {
+  return getMetaCol().findOne({ _session_id: sessionId }, { sort: { uploaded_at: -1 } });
 }
 
 // ── GET /api/analytics/columns — numeric/categorical column lists ───────────
 router.get("/columns", async (req, res) => {
-  const schema = await getSchema();
+  const schema = await getSchema(req.sessionId);
   if (!schema) return res.json({ numeric: [], categorical: [] });
   res.json({
     numeric: schema.columns.filter((c) => ["integer", "float"].includes(c.dtype)),
@@ -19,7 +19,7 @@ router.get("/columns", async (req, res) => {
 
 // ── GET /api/analytics/summary — describe() equivalent for numeric cols ─────
 router.get("/summary", async (req, res) => {
-  const schema = await getSchema();
+  const schema = await getSchema(req.sessionId);
   if (!schema) return res.status(400).json({ error: "لا توجد بيانات" });
   const numericCols = schema.columns.filter((c) => ["integer", "float"].includes(c.dtype));
   if (!numericCols.length) return res.json([]);
@@ -28,7 +28,7 @@ router.get("/summary", async (req, res) => {
   const results = [];
   for (const c of numericCols) {
     const pipeline = [
-      { $match: { ...ACTIVE, [c.name]: { $ne: null } } },
+      { $match: { _session_id: req.sessionId, ...ACTIVE, [c.name]: { $ne: null } } },
       {
         $group: {
           _id: null,
@@ -62,7 +62,7 @@ router.get("/group-by", async (req, res) => {
   if (!numeric || !categorical) return res.status(400).json({ error: "معطيات ناقصة" });
 
   const pipeline = [
-    { $match: ACTIVE },
+    { $match: { _session_id: req.sessionId, ...ACTIVE } },
     {
       $group: {
         _id: `$${categorical}`,
@@ -86,7 +86,7 @@ router.get("/histogram", async (req, res) => {
   const dataCol = getDataCol();
   const rangeAgg = await dataCol
     .aggregate([
-      { $match: { ...ACTIVE, [column]: { $ne: null } } },
+      { $match: { _session_id: req.sessionId, ...ACTIVE, [column]: { $ne: null } } },
       { $group: { _id: null, mn: { $min: `$${column}` }, mx: { $max: `$${column}` } } },
     ])
     .toArray();
@@ -98,7 +98,7 @@ router.get("/histogram", async (req, res) => {
 
   const boundaries = Array.from({ length: bins + 1 }, (_, i) => mn + i * width);
   const pipeline = [
-    { $match: { ...ACTIVE, [column]: { $ne: null } } },
+    { $match: { _session_id: req.sessionId, ...ACTIVE, [column]: { $ne: null } } },
     {
       $bucket: {
         groupBy: `$${column}`,
@@ -119,7 +119,7 @@ router.get("/histogram", async (req, res) => {
 
 // ── GET /api/analytics/correlation — Pearson correlation matrix ─────────────
 router.get("/correlation", async (req, res) => {
-  const schema = await getSchema();
+  const schema = await getSchema(req.sessionId);
   if (!schema) return res.status(400).json({ error: "لا توجد بيانات" });
   const numericCols = schema.columns
     .filter((c) => ["integer", "float"].includes(c.dtype))
@@ -128,7 +128,9 @@ router.get("/correlation", async (req, res) => {
 
   const projection = {};
   numericCols.forEach((c) => (projection[c] = 1));
-  const docs = await getDataCol().find(ACTIVE, { projection }).toArray();
+  const docs = await getDataCol()
+    .find({ _session_id: req.sessionId, ...ACTIVE }, { projection })
+    .toArray();
 
   const matrix = numericCols.map((c1) =>
     numericCols.map((c2) => round2(pearson(docs, c1, c2)))
@@ -159,7 +161,7 @@ router.get("/distribution", async (req, res) => {
   const column = req.query.column;
   if (!column) return res.status(400).json({ error: "معطيات ناقصة" });
   const pipeline = [
-    { $match: ACTIVE },
+    { $match: { _session_id: req.sessionId, ...ACTIVE } },
     { $group: { _id: `$${column}`, count: { $sum: 1 } } },
     { $sort: { count: -1 } },
   ];

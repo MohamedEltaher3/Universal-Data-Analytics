@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { useSchema } from "../context/SchemaContext";
 import { DTYPE_LABEL } from "../utils/format";
@@ -27,20 +28,25 @@ const NAV = [
   },
 ];
 
-function typeCounts(schema) {
-  const counts = {};
-  schema.columns.forEach((c) => {
-    counts[c.dtype] = (counts[c.dtype] || 0) + 1;
-  });
-  return counts;
-}
-
 export default function Layout() {
   const { schema, connected } = useSchema();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      <button
+        className="mobile-menu-btn"
+        aria-label="Toggle navigation"
+        onClick={() => setMenuOpen((v) => !v)}
+      >
+        <span />
+        <span />
+        <span />
+      </button>
+
+      {menuOpen && <div className="sidebar-backdrop" onClick={() => setMenuOpen(false)} />}
+
+      <aside className={`sidebar${menuOpen ? " open" : ""}`}>
         <div className="brand">
           <div className="brand-mark" />
           <div className="brand-text">
@@ -56,6 +62,7 @@ export default function Layout() {
               <NavLink
                 key={item.to}
                 to={item.to}
+                onClick={() => setMenuOpen(false)}
                 className={({ isActive }) => `nav-item${isActive ? " active" : ""}`}
               >
                 <span className="dot" />
